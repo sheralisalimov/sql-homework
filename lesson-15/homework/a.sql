@@ -1,0 +1,363 @@
+
+--1. Create a numbers table using a recursive query from 1 to 1000.
+
+WITH Nums AS (
+    SELECT 1 AS Number
+    UNION ALL
+    SELECT Number + 1
+    FROM Nums
+    WHERE Number < 1000
+)
+SELECT Number
+FROM Nums
+OPTION (MAXRECURSION 0);
+--2. Write a query to find the total sales per employee using a derived table.
+
+SELECT
+    e.FirstName,
+    e.LastName,
+    EmployeeSales.TotalSales
+FROM
+    Employees e
+JOIN (
+    SELECT
+        EmployeeID,
+        SUM(SalesAmount) AS TotalSales
+    FROM
+        Sales
+    GROUP BY
+        EmployeeID
+) AS EmployeeSales ON e.EmployeeID = EmployeeSales.EmployeeID;
+
+--3. Create a CTE to find the average salary of employees.
+
+WITH AvgSalaryCTE AS (
+    SELECT
+        AVG(Salary) AS AverageCompanySalary
+    FROM
+        Employees
+)
+SELECT AverageCompanySalary
+FROM AvgSalaryCTE;
+
+--4. Write a query using a derived table to find the highest sales for each product.
+
+SELECT
+    p.ProductName,
+    MaxSales.HighestSaleAmount
+FROM
+    Products p
+JOIN (
+    SELECT
+        ProductID,
+        MAX(SalesAmount) AS HighestSaleAmount
+    FROM
+        Sales
+    GROUP BY
+        ProductID
+) AS MaxSales ON p.ProductID = MaxSales.ProductID;
+
+--5. Beginning at 1, write a statement to double the number for each record, the max value you get should be less than 1000000.
+
+WITH DoubledNumbers AS (
+    SELECT CAST(1 AS BIGINT) AS Number
+    UNION ALL
+    SELECT Number * 2
+    FROM DoubledNumbers
+    WHERE Number * 2 < 1000000
+)
+SELECT Number
+FROM DoubledNumbers
+OPTION (MAXRECURSION 0);
+
+--6. Use a CTE to get the names of employees who have made more than 5 sales.
+
+WITH EmployeeSaleCounts AS (
+    SELECT
+        EmployeeID,
+        COUNT(SalesID) AS NumberOfSales
+    FROM
+        Sales
+    GROUP BY
+        EmployeeID
+    HAVING
+        COUNT(SalesID) > 5
+)
+SELECT
+    e.FirstName,
+    e.LastName
+FROM
+    Employees e
+JOIN
+    EmployeeSaleCounts esc ON e.EmployeeID = esc.EmployeeID;
+
+--7. Write a query using a CTE to find all products with sales greater than $500.
+
+WITH ProductSales AS (
+    SELECT
+        ProductID,
+        SUM(SalesAmount) AS TotalSalesAmount
+    FROM
+        Sales
+    GROUP BY
+        ProductID
+    HAVING
+        SUM(SalesAmount) > 500
+)
+SELECT
+    p.ProductName,
+    ps.TotalSalesAmount
+FROM
+    Products p
+JOIN
+    ProductSales ps ON p.ProductID = ps.ProductID;
+    
+--8. Create a CTE to find employees with salaries above the average salary.
+
+WITH AvgSalary AS (
+    SELECT AVG(Salary) AS CompanyAvgSalary
+    FROM Employees
+)
+SELECT
+    e.FirstName,
+    e.LastName,
+    e.Salary
+FROM
+    Employees e, AvgSalary a
+WHERE
+    e.Salary > a.CompanyAvgSalary;
+
+--1. Write a query using a derived table to find the top 5 employees by the number of orders made.
+
+SELECT
+    e.FirstName,
+    e.LastName,
+    OrdersCount.TotalOrders
+FROM
+    Employees e
+JOIN (
+    SELECT
+        EmployeeID,
+        COUNT(SalesID) AS TotalOrders
+    FROM
+        Sales
+    GROUP BY
+        EmployeeID
+) AS OrdersCount ON e.EmployeeID = OrdersCount.EmployeeID
+ORDER BY
+    OrdersCount.TotalOrders DESC
+OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;
+
+--2. Write a query using a derived table to find the sales per product category.
+
+
+SELECT
+    p.CategoryID,
+    SUM(s.SalesAmount) AS TotalSales
+FROM
+    Sales s
+JOIN
+    Products p ON s.ProductID = p.ProductID
+GROUP BY
+    p.CategoryID;
+
+--3. Write a script to return the factorial of each value next to it.
+
+WITH Factorials AS (
+    SELECT
+        Number,
+        CAST(1.0 AS DECIMAL(38,0)) AS FactorialValue
+    FROM
+        Numbers1
+    WHERE
+        Number = 0 -- Assuming 0! = 1 if 0 is possible
+    UNION ALL
+    SELECT
+        N.Number,
+        CASE
+            WHEN F.Number = 0 THEN 1
+            ELSE F.FactorialValue * N.Number
+        END
+    FROM
+        Numbers1 N
+    JOIN
+        Factorials F ON N.Number = F.Number + 1
+    WHERE
+        N.Number > 0
+)
+SELECT Number, FactorialValue
+FROM Factorials
+ORDER BY Number;
+
+-- Revised solution for factorial:
+WITH RECURSIVE_FACTORIAL AS (
+    SELECT
+        Number,
+        CAST(1 AS BIGINT) AS FactorialResult,
+        1 AS Counter
+    FROM Numbers1
+    UNION ALL
+    SELECT
+        RF.Number,
+        RF.FactorialResult * (RF.Counter + 1),
+        RF.Counter + 1
+    FROM RECURSIVE_FACTORIAL RF
+    WHERE RF.Counter < RF.Number
+)
+SELECT Number, MAX(FactorialResult) AS Factorial
+FROM RECURSIVE_FACTORIAL
+GROUP BY Number
+ORDER BY Number;
+
+--4. This script uses recursion to split a string into rows of substrings for each character in the string.
+
+WITH CharSplitter AS (
+    SELECT
+        Id,
+        String,
+        CAST(SUBSTRING(String, 1, 1) AS VARCHAR(1)) AS Character,
+        1 AS Position
+    FROM
+        Example
+    UNION ALL
+    SELECT
+        cs.Id,
+        cs.String,
+        CAST(SUBSTRING(cs.String, cs.Position + 1, 1) AS VARCHAR(1)),
+        cs.Position + 1
+    FROM
+        CharSplitter cs
+    WHERE
+        cs.Position < LEN(cs.String)
+)
+SELECT
+    Id,
+    String,
+    Character,
+    Position
+FROM
+    CharSplitter
+ORDER BY
+    Id, Position
+OPTION (MAXRECURSION 0);
+
+--5. Use a CTE to calculate the sales difference between the current month and the previous month.
+
+WITH MonthlySales AS (
+    SELECT
+        FORMAT(SaleDate, 'yyyy-MM') AS SaleMonth,
+        SUM(SalesAmount) AS TotalMonthlySales
+    FROM
+        Sales
+    GROUP BY
+        FORMAT(SaleDate, 'yyyy-MM')
+)
+SELECT
+    CurrentMonth.SaleMonth,
+    CurrentMonth.TotalMonthlySales,
+    LAG(CurrentMonth.TotalMonthlySales, 1, 0) OVER (ORDER BY CurrentMonth.SaleMonth) AS PreviousMonthSales,
+    CurrentMonth.TotalMonthlySales - LAG(CurrentMonth.TotalMonthlySales, 1, 0) OVER (ORDER BY CurrentMonth.SaleMonth) AS SalesDifference
+FROM
+    MonthlySales AS CurrentMonth
+ORDER BY
+    CurrentMonth.SaleMonth;
+
+--6. Create a derived table to find employees with sales over $45000 in each quarter.
+
+SELECT
+    e.FirstName,
+    e.LastName,
+    QuarterlySales.SalesQuarter,
+    QuarterlySales.TotalQuarterlySales
+FROM
+    Employees e
+JOIN (
+    SELECT
+        EmployeeID,
+        DATEPART(quarter, SaleDate) AS SalesQuarter,
+        SUM(SalesAmount) AS TotalQuarterlySales
+    FROM
+        Sales
+    GROUP BY
+        EmployeeID,
+        DATEPART(quarter, SaleDate)
+    HAVING
+        SUM(SalesAmount) > 45000
+) AS QuarterlySales ON e.EmployeeID = QuarterlySales.EmployeeID
+ORDER BY
+    e.FirstName, e.LastName, QuarterlySales.SalesQuarter;
+
+--1. This script uses recursion to calculate Fibonacci numbers
+
+WITH Fibonacci AS (
+    SELECT 0 AS Num, 1 AS NextNum
+    UNION ALL
+    SELECT NextNum, Num + NextNum
+    FROM Fibonacci
+    WHERE NextNum <= 100 -- Or any upper limit you desire
+)
+SELECT Num AS FibonacciNumber
+FROM Fibonacci
+WHERE Num <= 100 -- Filter to show numbers within range, assuming starting from 0. If starting from 1, adjust
+OPTION (MAXRECURSION 0);
+
+--2. Find a string where all characters are the same and the length is greater than 1.
+
+SELECT Vals
+FROM FindSameCharacters
+WHERE LEN(Vals) > 1 AND Vals NOT LIKE '%[^' + SUBSTRING(Vals, 1, 1) + ']%';
+
+--3. Create a numbers table that shows all numbers 1 through n and their order gradually increasing by the next number in the sequence.
+
+WITH NumSequence AS (
+    SELECT 1 AS Number, CAST('1' AS VARCHAR(MAX)) AS SequenceString
+    UNION ALL
+    SELECT
+        Number + 1,
+        SequenceString + CAST(Number + 1 AS VARCHAR(MAX))
+    FROM
+        NumSequence
+    WHERE
+        Number < 9 -- Example: for n=9 to show 123456789. Adjust '9' for desired 'n'
+)
+SELECT SequenceString
+FROM NumSequence
+OPTION (MAXRECURSION 0);
+
+--4. Write a query using a derived table to find the employees who have made the most sales in the last 6 months.**
+
+SELECT
+    e.FirstName,
+    e.LastName,
+    RecentSales.TotalSales
+FROM
+    Employees e
+JOIN (
+    SELECT
+        EmployeeID,
+        SUM(SalesAmount) AS TotalSales,
+        RANK() OVER (ORDER BY SUM(SalesAmount) DESC) AS SalesRank
+    FROM
+        Sales
+    WHERE
+        SaleDate >= DATEADD(month, -6, GETDATE()) -- Adjust GETDATE() to a fixed date if needed for reproducible results with sample data
+    GROUP BY
+        EmployeeID
+) AS RecentSales ON e.EmployeeID = RecentSales.EmployeeID
+WHERE
+    RecentSales.SalesRank = 1;
+--5. Write a T-SQL query to remove the duplicate integer values present in the string column. Additionally, remove the single integer character that appears in the string.
+
+WITH CleanedStrings AS (
+    SELECT
+        PawanName,
+        Pawan_slug_name,
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(Pawan_slug_name, '0', ''), '1', ''), '2', ''), '3', ''), '4', ''), '5', ''), '6', ''), '7', ''), '8', ''), '9', '') AS CleanedSlugName
+    FROM
+        RemoveDuplicateIntsFromNames
+)
+SELECT
+    PawanName,
+    CleanedSlugName
+FROM
+    CleanedStrings;
